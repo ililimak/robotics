@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Accessible Book Shelf Demo</title>
+
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <style>
+    @keyframes robot-move {
+      0% { transform: translateY(0); }
+      50% { transform: translateY(-6px); }
+      100% { transform: translateY(0); }
+    }
+    .animate-robot {
+      animation: robot-move 0.8s linear infinite;
+    }
+  </style>
+</head>
+
+<body class="bg-blue-50 text-blue-900 min-h-screen">
+
+<!-- MOBILE HEADER -->
+<header class="md:hidden flex items-center justify-between bg-blue-300 p-4 shadow">
+  <h1 class="font-bold text-lg">📚 Book Shelf</h1>
+  <button onclick="toggleMenu()" class="text-2xl focus:ring" aria-label="Open menu">☰</button>
+</header>
+
+<!-- SIDEBAR -->
+<nav id="sidebar"
+  class="fixed md:static top-0 left-0 w-64 h-full bg-blue-300/90 backdrop-blur-xl p-4 shadow-lg
+         transform -translate-x-full md:translate-x-0 transition-transform z-30"
+  aria-label="Book categories">
+
+  <button onclick="toggleMenu()" class="md:hidden mb-4">✕ Close</button>
+
+  <h2 class="font-bold text-xl mb-4">Menu</h2>
+  <ul class="space-y-3">
+    <li><button onclick="setCategory('All')">All Books</button></li>
+    <li><button onclick="setCategory('Sci-Fi')">Sci-Fi</button></li>
+    <li><button onclick="setCategory('Fantasy')">Fantasy</button></li>
+    <li><button onclick="setCategory('Mystery')">Mystery</button></li>
+    <li><button onclick="setCategory('Lifestyle')">Lifestyle</button></li>
+  </ul>
+</nav>
+
+<!-- MAIN -->
+<main class="p-4 md:ml-64">
+
+  <input
+    id="searchBox"
+    type="text"
+    placeholder="Search books..."
+    class="mb-4 w-full border rounded-full px-4 py-3 focus:ring"
+    oninput="updateSearch()"
+  />
+
+  <section id="bookGrid"
+    class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4"
+    aria-live="polite"></section>
+
+</main>
+
+<!-- BOOK MODAL (PC + MOBILE SAME) -->
+<section id="bookModal"
+  class="hidden fixed inset-0 bg-black/40 z-40 flex items-center justify-center p-4"
+  role="dialog" aria-modal="true">
+
+  <div class="bg-white w-full max-w-3xl rounded-xl shadow-lg overflow-y-auto max-h-[90vh] p-4">
+    <button onclick="closeModal()" class="mb-3 bg-gray-200 px-3 py-1 rounded">← Back</button>
+    <div id="modalContent"></div>
+  </div>
+</section>
+
+<script>
+/* ---------------- DATA ---------------- */
+const books = [
+  { id:1, title:"The Quantum Voyager", author:"A. Solara", cover:"https://picsum.photos/200/300?1", description:"A sci-fi adventure through folded dimensions.", category:"Sci-Fi", status:"Available" },
+  { id:2, title:"Whispers of the Forest", author:"E. Liora", cover:"https://picsum.photos/200/300?2", description:"A fantasy tale of elves and destiny.", category:"Fantasy", status:"Available" },
+  { id:3, title:"Clockwork Haven", author:"M. Adrik", cover:"https://picsum.photos/200/300?3", description:"A steampunk mystery in a floating city.", category:"Mystery", status:"Available" },
+  { id:4, title:"The Art of Silent Gardens", author:"Kael Rin", cover:"https://picsum.photos/200/300?4", description:"A journey through Zen gardens.", category:"Lifestyle", status:"Available" }
+];
+
+let currentCategory = "All";
+let searchQuery = "";
+
+/* ---------------- HELPERS ---------------- */
+function statusColor(s) {
+  return s === "Available" ? "bg-green-600"
+       : s === "Reading" ? "bg-yellow-500"
+       : "bg-blue-600";
+}
+
+/* ---------------- RENDER ---------------- */
+function renderBooks() {
+  const grid = document.getElementById("bookGrid");
+  grid.innerHTML = "";
+
+  books.filter(b =>
+    (currentCategory === "All" || b.category === currentCategory) &&
+    b.title.toLowerCase().includes(searchQuery.toLowerCase())
+  ).forEach(b => {
+    grid.innerHTML += `
+      <article class="bg-white rounded-xl shadow p-3">
+        <img src="${b.cover}" class="h-40 w-full object-cover rounded-lg">
+        <h3 class="font-semibold mt-2">${b.title}</h3>
+        <p class="text-sm text-gray-600">${b.author}</p>
+        <span class="text-xs px-2 py-1 rounded text-white ${statusColor(b.status)}">
+          ${b.status}
+        </span>
+        <button onclick="openBook(${b.id})"
+          class="mt-2 w-full bg-blue-600 text-white py-2 rounded-lg">
+          View Details
+        </button>
+      </article>
+    `;
+  });
+}
+
+/* ---------------- EVENTS ---------------- */
+function toggleMenu() {
+  document.getElementById("sidebar").classList.toggle("-translate-x-full");
+}
+
+function setCategory(cat) {
+  currentCategory = cat;
+  renderBooks();
+  toggleMenu();
+}
+
+function updateSearch() {
+  searchQuery = searchBox.value;
+  renderBooks();
+}
+
+function openBook(id) {
+  const b = books.find(x => x.id === id);
+  const modal = document.getElementById("bookModal");
+  const content = document.getElementById("modalContent");
+
+  let action = "";
+  if (b.status === "Available") {
+    action = `<button onclick="getBook(${id})"
+      class="mt-4 bg-green-600 text-white py-3 rounded-xl w-full">
+      🤖 Get Book
+    </button>`;
+  } else if (b.status === "Reading") {
+    action = `<button onclick="finishBook(${id})"
+      class="mt-4 bg-yellow-500 text-white py-3 rounded-xl w-full">
+      Finish Book
+    </button>`;
+  }
+
+  content.innerHTML = `
+    <div class="flex flex-col md:flex-row gap-6">
+      <img src="${b.cover}" class="w-full md:w-48 rounded-xl shadow">
+      <div>
+        <h1 class="text-2xl font-bold">${b.title}</h1>
+        <p class="text-gray-600">${b.author}</p>
+        <p class="mt-3">${b.description}</p>
+        <p class="mt-3 font-semibold">
+          Status:
+          <span class="px-2 py-1 rounded text-white ${statusColor(b.status)}">${b.status}</span>
+        </p>
+        <div id="robotNotif" class="mt-2 text-sm"></div>
+        ${action}
+      </div>
+    </div>
+  `;
+
+  modal.classList.remove("hidden");
+}
+
+function closeModal() {
+  document.getElementById("bookModal").classList.add("hidden");
+}
+
+function getBook(id) {
+  const b = books.find(x => x.id === id);
+  const n = document.getElementById("robotNotif");
+  n.textContent = "Robot is delivering the book...";
+  n.classList.add("animate-robot");
+
+  setTimeout(() => {
+    b.status = "Reading";
+    n.textContent = "Book received!";
+    n.classList.remove("animate-robot");
+    renderBooks();
+    openBook(id);
+  }, 2000);
+}
+
+function finishBook(id) {
+  const b = books.find(x => x.id === id);
+  b.status = "Finished";
+  renderBooks();
+  openBook(id);
+}
+
+renderBooks();
+</script>
+
+</body>
+</html>
